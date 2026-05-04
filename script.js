@@ -1,85 +1,109 @@
-// Fonction utilitaire pour sécuriser le texte (empêche le code HTML malveillant)
-function escapeHtml(unsafe) {
-    return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
 async function sendMessage() {
     const input = document.getElementById("input");
     const messages = document.getElementById("messages");
+    const moduleSelect = document.getElementById("moduleSelect")?.value || "video";
 
     const text = input.value.trim();
     if (!text) return;
 
-    // 🔒 sécurisation
-    const safeText = escapeHtml(text);
-
-    // Ajout du message utilisateur proprement
-    messages.insertAdjacentHTML('beforeend', `
+    // Affichage message user
+    messages.innerHTML += `
         <div class="user">
-            <div class="bubble">${safeText}</div>
+            <div class="bubble">${escapeHtml(text)}</div>
         </div>
-    `);
+    `;
 
     input.value = "";
 
-    // loading IA
+    // Loader
     const loadingId = "load_" + Date.now();
-    messages.insertAdjacentHTML('beforeend', `
-        <div id="${loadingId}" class="ai">
-            <div class="bubble">🤖 IA réfléchit...</div>
-        </div>
-    `);
 
-    messages.scrollTop = messages.scrollHeight;
+    messages.innerHTML += `
+        <div id="${loadingId}" class="ai">
+            <div class="bubble">🤖 YELOX réfléchit...</div>
+        </div>
+    `;
 
     try {
-        const res = await fetch("http://localhost:3000/generate", {
+        const response = await fetch("https://TON-BACKEND.onrender.com/generate", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ prompt: text })
+            body: JSON.stringify({
+                prompt: text,
+                module: moduleSelect
+            })
         });
 
-        const data = await res.json();
+        const data = await response.json();
 
-        // Supprime le chargement
-        const loadingElement = document.getElementById(loadingId);
-        if (loadingElement) {
-            loadingElement.remove();
-        }
+        // Supprimer loader
+        document.getElementById(loadingId)?.remove();
 
-        const reply = data.result || "❌ Aucune réponse IA";
+        const moduleConseil = genererConseil(moduleSelect);
 
-        // Ajout de la réponse de l'IA
-        messages.insertAdjacentHTML('beforeend', `
+        const finalText = `
+            <strong>${moduleConseil.titre}</strong><br/><br/>
+            <strong>1. IDÉES :</strong><br/>
+            - ${data.result || "Action générée."}<br/><br/>
+            <strong>2. ERREURS À ÉVITER :</strong><br/>
+            - ${moduleConseil.erreur}
+        `;
+
+        messages.innerHTML += `
             <div class="ai">
-                <div class="bubble">
-                   ${escapeHtml(reply)}
-                </div>
+                <div class="bubble">${finalText}</div>
             </div>
-        `);
+        `;
 
     } catch (error) {
-        // Supprime le chargement en cas d'erreur
-        const loadingElement = document.getElementById(loadingId);
-        if (loadingElement) {
-            loadingElement.remove();
-        }
+        document.getElementById(loadingId)?.remove();
 
-        messages.insertAdjacentHTML('beforeend', `
+        messages.innerHTML += `
             <div class="ai">
-                <div class="bubble">
-                    ❌ Erreur connexion serveur IA
-                </div>
+                <div class="bubble">❌ Erreur serveur YELOX</div>
             </div>
-        `);
+        `;
     }
 
+    // Scroll auto
     messages.scrollTop = messages.scrollHeight;
+}
+
+function escapeHtml(text) {
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
+// ==========================================
+// L'écosystème des modules de YELOX Core
+// ==========================================
+const categoriesModules = {
+    marketing: {
+        titre: "MODULE : Marketing Digital",
+        erreur: "Ne pas spammer les réseaux et mal cibler."
+    },
+    video: {
+        titre: "MODULE : Scénario et Vidéo",
+        erreur: "Accroche faible = perte d'audience."
+    },
+    musique: {
+        titre: "MODULE : Production Musicale",
+        erreur: "Problème de droits ou mauvaise qualité."
+    },
+    dev: {
+        titre: "MODULE : Back-end & Dev",
+        erreur: "Ne jamais exposer les clés API."
+    },
+    design: {
+        titre: "MODULE : Infographie",
+        erreur: "Visuels surchargés ou non lisibles."
+    }
+};
+
+function genererConseil(categorie) {
+    return categoriesModules[categorie] || categoriesModules["video"];
 }
